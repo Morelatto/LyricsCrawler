@@ -1,7 +1,7 @@
 import scrapy
 import string
 
-from crawlers.items import DarkLyricsSongLoader, DarkLyricsRecordLoader
+from crawler.items import DarkLyricsSongLoader, DarkLyricsRecordLoader
 
 
 class DarkLyricsSpider(scrapy.Spider):
@@ -11,13 +11,11 @@ class DarkLyricsSpider(scrapy.Spider):
     def start_requests(self):
         for char in list(string.ascii_lowercase) + ["19"]:
             yield scrapy.Request(url="{url}/{char}.html".format(url=self.url, char=char), callback=self.parse_artists)
-            break
 
     def parse_artists(self, response):
         for artist in response.css("div.artists a::attr(href)").extract():
             artist_url = response.urljoin(artist)
             yield scrapy.Request(artist_url, callback=self.parse_albums)
-            break
 
     def parse_albums(self, response):
         for album in response.css("div.album"):
@@ -29,10 +27,10 @@ class DarkLyricsSpider(scrapy.Spider):
         for lyrics_n in response.css("div.lyrics a::attr(name)").extract():
             song_loader = DarkLyricsSongLoader(selector=response)
 
-            song_loader.add_xpath("number", "//div[@class='lyrics']//a[@name={}]/text()".format(lyrics_n), re="(\d+)\.")
-            song_loader.add_xpath("title", "//div[@class='lyrics']//a[@name={}]/text()".format(lyrics_n), re="\. (.+)")
-            song_loader.add_xpath("lyrics",
-                                  "//div[@class='lyrics']/text()[count(preceding-sibling::h3)={}]".format(lyrics_n))
+            lyrics_div_loader = song_loader.nested_xpath("//div[@class='lyrics']")
+            lyrics_div_loader.add_xpath("number", "//a[@name={}]/text()".format(lyrics_n), re="(\d+)\.")
+            lyrics_div_loader.add_xpath("title", "//a[@name={}]/text()".format(lyrics_n), re="\. (.+)")
+            lyrics_div_loader.add_xpath("lyrics", "//text()[count(preceding-sibling::h3)={}]".format(lyrics_n))
             songs.append(song_loader.load_item())
 
         record_loader = DarkLyricsRecordLoader(selector=response)
